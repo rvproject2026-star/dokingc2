@@ -426,10 +426,12 @@ function hapusSemuaDatabase() {
                 alert("Data laporan docking berhasil dibersihkan.");
             })
             .catch((error) => {
+                console.error("Gagal menghapus:", error);
                 alert("Gagal menghapus data: " + error.message);
             });
     }
 }
+
 
 // --- 9. DOWNLOAD EXCEL REKAP ---
 function downloadExcel() {
