@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Doking Cilegon 2</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Library Firebase (App, Database, dan Auth) -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script> <!-- TAMBAHKAN BARIS INI -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<!-- Script aplikasi kita -->
+<script src="config.js"></script>
+<script src="app.js"></script>
+
+    <style>
+        /* --- PALET WARNA TERANG: BIRU & PUTIH --- */
+        :root {
+            --bg-main: #f1f5f9;          
+            --bg-card: #ffffff;          
+            --primary: #0284c7;          
+            --primary-hover: #0369a1;    
+            --primary-light: #e0f2fe;    
+            --success: #16a34a;          
+            --danger: #dc2626;           
+            --text-main: #1e293b;        
+            --text-muted: #64748b;       
+            --border-color: #e2e8f0;     
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        /* --- NAVIGASI HALAMAN --- */
+        .page-section {
+            display: none;
+            width: 100%;
+        }
+        .page-section.active {
+            display: block;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* --- CARD LOGIN & PROFIL --- */
+        .card-container {
+            background: var(--bg-card);
+            padding: 40px 32px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(2, 132, 199, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02);
+            border: 1px solid var(--border-color);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            margin: 0 auto;
+        }
+
+        h1.login-title { 
+            font-size: 22px; 
+            font-weight: 700;
+            margin-bottom: 6px; 
+            letter-spacing: 2px; 
+            color: var(--primary); 
+            text-transform: uppercase;
+        }
+        p.login-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 32px; }
+        .input-group { margin-bottom: 24px; text-align: left; }
+        label.login-label { display: block; font-size: 11px; margin-bottom: 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+        
+        input[type="password"] {
+            width: 100%; padding: 14px 16px; background: #f8fafc; border: 1px solid var(--border-color);
+            border-radius: 8px; color: var(--text-main); font-size: 16px; text-align: center; letter-spacing: 4px;
+            transition: all 0.2s ease;
+        }
+        input[type="password"]:focus { outline: none; border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15); }
+
+        .btn-submit {
+            width: 100%; padding: 14px; background: var(--primary); border: none; border-radius: 8px;
+            color: #ffffff; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s ease;
+            letter-spacing: 0.5px;
+        }
+        .btn-submit:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .error-msg { color: var(--danger); font-size: 12px; margin-top: 12px; display: none; font-weight: 600; }
+
+        /* Tampilan Profil User */
+        .profile-img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary-light); margin-bottom: 18px; }
+        .profile-name { font-size: 20px; font-weight: 700; color: var(--text-main); margin-bottom: 4px; }
+        .profile-role { font-size: 12px; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 32px; font-weight: 700; }
+        
+        .btn-docking {
+            display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+            width: 100%; padding: 14px; background: var(--primary); color: white; text-decoration: none;
+            border-radius: 8px; font-size: 14px; font-weight: 700; transition: all 0.2s ease;
+            cursor: pointer; border: none;
+        }
+        .btn-docking:hover { background: var(--primary-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2); }
+
+        /* --- WORKSPACE AREA & CONTROL PANEL --- */
+        .light-theme-wrapper { width: 100%; display: flex; justify-content: center; }
+        
+        .light-theme {
+            background: var(--bg-card);
+            color: var(--text-main);
+            padding: 32px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border-color);
+            width: 100%;
+            max-width: 950px;
+            margin: 0 auto;
+        }
+
+        .form-header { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); border-radius: 12px; overflow: hidden; margin-bottom: 28px; }
+        .header-content { padding: 24px; color: white; text-align: left; }
+        .header-content h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; color: #ffffff; }
+        .header-content p { font-size: 13px; color: #e0f2fe; }
+        
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 20px; }
+        
+        @media (max-width: 768px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .light-theme { padding: 20px 16px; }
+        }
+
+        .form-card { background: #f8fafc; border-radius: 10px; padding: 20px; border: 1px solid var(--border-color); text-align: left; transition: all 0.2s ease; }
+        .form-card.full-width { grid-column: 1 / -1; }
+        .form-card:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1); background: #ffffff; }
+        
+        .form-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 10px; display: block; }
+        .required { color: var(--danger); }
+        
+        input[type="text"], input[type="date"], select { 
+            width: 100%; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 8px; 
+            font-size: 14px; outline: none; background: #ffffff; color: var(--text-main); 
+            transition: all 0.2s ease;
+        }
+        input[type="text"]:focus, input[type="date"]:focus, select:focus { border-color: var(--primary); }
+        input[readonly] { background-color: #e2e8f0; color: #475569; cursor: not-allowed; font-weight: 600; }
+        
+        /* Tombol Aksi */
+        .action-container { display: flex; gap: 14px; margin-top: 28px; margin-bottom: 32px; }
+        .btn { 
+            flex: 1; padding: 14px; border-radius: 8px; font-size: 14px; font-weight: 700; 
+            cursor: pointer; border: none; transition: all 0.2s ease; 
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px; 
+        }
+        .btn-submit-form { background-color: var(--primary); color: white; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15); }
+        .btn-submit-form:hover { background-color: var(--primary-hover); transform: translateY(-1px); }
+        .btn-submit-form:disabled { background-color: #cbd5e1; color: #94a3b8; transform: none; cursor: not-allowed; }
+        .btn-logout-light { background-color: #f1f5f9; color: #475569; border: 1px solid var(--border-color); }
+        .btn-logout-light:hover { background-color: #e2e8f0; }
+
+        /* Tabel & Riwayat */
+        .history-container { background: #ffffff; padding: 24px; border-radius: 12px; border: 1px solid var(--border-color); text-align: left; }
+        .history-container h2 { font-size: 13px; font-weight: 700; margin-bottom: 20px; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center; }
+        .badge-count { background: var(--primary-light); color: var(--primary-hover); padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; }
+        
+        .table-responsive { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); max-height: 320px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; background: #ffffff; }
+        th, td { padding: 14px 16px; border-bottom: 1px solid var(--border-color); white-space: nowrap; color: #334155; }
+        th { background-color: #f8fafc; color: var(--text-muted); font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 5; border-bottom: 2px solid var(--border-color); }
+        tr:hover td { background-color: #f8fafc; }
+        
+        .badge-status { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; display: inline-block; }
+        .status-selesai { background: #dcfce7; color: #16a34a; }
+        .status-tidak { background: #fee2e2; color: #dc2626; }
+        .status-pending { background: #fef3c7; color: #d97706; }
+        .empty-state { text-align: center; color: var(--text-muted); padding: 32px; font-size: 13px; }
+
+        .info-box { font-size: 13px; color: var(--text-main); background: #f8fafc; padding: 16px 20px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; border: 1px solid var(--border-color); border-left: 4px solid var(--primary); font-weight: 600; }
+        .btn-clear { background-color: var(--danger); color: white; }
+        .btn-clear:hover { background-color: #b91c1c; }
+        .btn-export { background-color: var(--success); color: white; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.15); }
+        .btn-export:hover { background-color: #15803d; }
+        input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+    </style>
+
+    <!-- Firebase & Library Dependencies -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+    <!-- 1. HALAMAN LOGIN -->
+    <div id="sectionLogin" class="page-section active">
+        <div class="card-container">
+            <h1 class="login-title">RUANG DOKING C2</h1>
+            <p class="login-desc">Masukkan NIK Karyawan Anda</p>
+            
+            <form onsubmit="prosesLogin(event)">
+                <div class="input-group">
+                    <label class="login-label" for="password">Nomor NIK</label>
+                    <input type="password" id="password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn-submit">MASUK SISTEM</button>
+                <div class="error-msg" id="errorMsg">NIK salah atau tidak terdaftar!</div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. HALAMAN PROFIL USER -->
+    <div id="sectionProfil" class="page-section">
+        <div class="card-container">
+            <h1 class="login-title">PROFIL USER</h1>
+            <p class="login-desc">Otentikasi berhasil terverifikasi</p>
+            
+            <img src="" id="userFoto" class="profile-img" alt="Foto Profil">
+            <div class="profile-name" id="userNama">-</div>
+            <div class="profile-role" id="userJabatan">-</div>
+            
+            <button onclick="bukaHalamanKerja()" id="btnAksiProfil" class="btn-docking">
+                <i class="fa-solid fa-right-to-bracket"></i> MASUK AREA KERJA
+            </button>
+        </div>
+    </div>
+
+    <!-- 3. HALAMAN INPUT DATA KARYAWAN -->
+    <div id="sectionInputDocking" class="page-section">
+        <div class="light-theme-wrapper">
+            <div class="light-theme">
+                <div class="form-header">
+                    <div class="header-content">
+                        <h1 id="karyawanHeaderTitle">Ruang Docking</h1>
+                        <p>wajib untuk detail mengisi ansus nya</p>
+                    </div>
+                </div>
+
+                <form id="updateForm" onsubmit="kirimKeFirebase(event)">
+                    <div class="form-grid">
+                        <div class="form-card">
+                            <label class="form-label">Kolektor (Remedial/MK2) <span class="required">*</span></label>
+                            <select id="collector_select" required onchange="filterCustomers(this.value)">
+                                <option value="">-- Pilih Nama Kolektor --</option>
+                            </select>
+                        </div>
+
+                        <div class="form-card">
+                            <label class="form-label">Nama Nasabah / Customer <span class="required">*</span></label>
+                            <select id="customer_select" required disabled onchange="isiOtomatisNoKontrak(this.value)">
+                                <option value="">-- Pilih Kolektor Dahulu --</option>
+                            </select>
+                        </div>
+
+                        <div class="form-card">
+                            <label class="form-label">Nomor Kontrak</label>
+                            <input type="text" id="no_kontrak" readonly placeholder="Otomatis terisi...">
+                        </div>
+
+                        <div class="form-card">
+                            <label class="form-label">Tgl Prediksi Selesai (JB) <span class="required">*</span></label>
+                            <input type="date" id="tgl_prediksi_jb" required>
+                        </div>
+
+                        <div class="form-card full-width">
+                            <label class="form-label">Deliquency (Dlq) <span class="required">*</span></label>
+                            <input type="text" id="deliquency" required placeholder="Misal: M1, M2, WO">
+                        </div>
+
+                        <div class="form-card full-width">
+                            <label class="form-label">Detail Kasus / Analisa Kasus (Ansus) <span class="required">*</span></label>
+                            <input type="text" id="detail_kasus" required placeholder="Tulis catatan penanganan kasus nasabah...">
+                        </div>
+
+                        <div class="form-card full-width">
+                            <label class="form-label">Prediksi Kelayakan <span class="required">*</span></label>
+                            <select id="prediksi_sukses" required>
+                                <option value="">-- Pilih Status Prediksi Kelayakan --</option>
+                                <option value="SELESAI">SELESAI</option>
+                                <option value="TIDAK SELESAI">TIDAK SELESAI</option>
+                                <option value="PENDING">PENDING / MONITORING</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="action-container">
+                        <button type="button" class="btn btn-logout-light" onclick="logout()"><i class="fa-solid fa-power-off"></i> Keluar</button>
+                        <button type="submit" id="btnSubmit" class="btn btn-submit-form">Kirim Laporan</button>
+                    </div>
+                </form>
+
+                <div class="history-container">
+                    <h2>Daftar Input Masuk Hari Ini <span class="badge-count" id="liveCount">0 Terinput</span></h2>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="text-align: center; width: 60px;">No</th>
+                                    <th>Nama Customer</th>
+                                    <th>Kolektor</th>
+                                    <th>Prediksi Kelayakan</th>
+                                </tr>
+                            </thead>
+                            <tbody id="liveHistoryBody">
+                                <tr>
+                                    <td colspan="4" class="empty-state">Menghubungkan ke basis data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. HALAMAN CONTROL PANEL PAK SALMAN -->
+    <div id="sectionRekapSalman" class="page-section">
+        <div class="light-theme-wrapper">
+            <div class="light-theme">
+                <div class="form-header">
+                    <div class="header-content">
+                        <h1><i class="fa-solid fa-sliders"></i> REKAP HASIL DOCKING</h1>
+                        <p>Halaman Pemantauan Data dan Manajemen Laporan Utama Pak Salman</p>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <span>Total Rekap Masuk: <strong id="totalNasabah" style="color: var(--primary);">0</strong></span>
+                    <span>Terpilih Cetak: <strong id="totalTerpilih" style="color: var(--success);">0</strong></span>
+                </div>
+                
+                <div class="form-card full-width" style="margin-bottom: 24px; padding: 0; overflow:hidden; background: #ffffff;">
+                    <div style="padding: 20px 20px 10px 20px; font-size: 12px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;">MONITORING LIVE INPUT KOLEKTOR</div>
+                    <div id="tableWrapper">
+                        <div class="empty-state">Sinkronisasi database online...</div>
+                    </div>
+                </div>
+                
+                <div class="action-container">
+                    <button class="btn btn-logout-light" onclick="logout()"><i class="fa-solid fa-power-off"></i> Keluar</button>
+                    <button class="btn btn-clear" onclick="hapusSemuaDatabase()"><i class="fa-solid fa-trash-can"></i> Bersihkan Data</button>
+                    <button class="btn btn-export" onclick="downloadExcel()"><i class="fa-solid fa-file-excel"></i> Download Rekap Excel (.xlsx)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panggil file konfigurasi dan logika terpisah -->
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
