@@ -1,4 +1,3 @@
-// --- LOGIKA LOGIN FIREBASE AUTH DENGAN EMAIL SEMU ---
 function prosesLogin(event) {
     event.preventDefault();
     
@@ -6,34 +5,36 @@ function prosesLogin(event) {
     const errorMsg = document.getElementById('errorMsg');
     const btnSubmit = document.querySelector('.btn-submit');
     
-    if (!inputNik) return;
+    if (!inputNik) {
+        alert("Masukkan NIK terlebih dahulu!");
+        return;
+    }
 
+    // Ubah tampilan tombol saat memproses
     btnSubmit.innerText = "VERIFIKASI...";
     btnSubmit.disabled = true;
+    errorMsg.style.display = 'none';
 
-    // 1. Format NIK menjadi Email Semu di balik layar
     const emailSemu = `${inputNik}@doking.com`;
-    
-    // Asumsi password sama dengan NIK. Jika ada field password terpisah, sesuaikan variabelnya.
-    const password = inputNik; 
+    const passwordSemu = inputNik; // Asumsi password adalah NIK
 
-    // 2. Login resmi menggunakan Firebase Auth
-    firebase.auth().signInWithEmailAndPassword(emailSemu, password)
+    // 1. Verifikasi Auth
+    firebase.auth().signInWithEmailAndPassword(emailSemu, passwordSemu)
         .then((userCredential) => {
-            // 3. Jika otentikasi berhasil, ambil data profil karyawan berdasarkan NIK
+            console.log("Auth berhasil, mengambil profil...");
+            // 2. Ambil data profil dari database
             return database.ref('master_karyawan/' + inputNik).once('value');
         })
         .then((snapshot) => {
+            // Reset tombol
             btnSubmit.innerText = "MASUK SISTEM";
             btnSubmit.disabled = false;
 
             if (snapshot.exists()) {
                 userAktif = snapshot.val();
-                userAktif.nik = inputNik; // Simpan NIK aktif
-                errorMsg.style.display = 'none';
-                document.getElementById('password').value = '';
-
-                // Tampilkan data ke card profil
+                userAktif.nik = inputNik;
+                
+                // Tampilkan profil ke layar
                 document.getElementById('userNama').innerText = userAktif.nama;
                 document.getElementById('userJabatan').innerText = userAktif.jabatan;
                 document.getElementById('userFoto').src = userAktif.foto || 'default.png';
@@ -47,27 +48,24 @@ function prosesLogin(event) {
 
                 switchPage('sectionProfil');
             } else {
-                alert("⚠️ Akun terverifikasi, tetapi data profil tidak ditemukan di database!");
+                // Jika NIK ada di Auth tapi tidak ada di Realtime Database
+                alert("⚠️ Login Auth berhasil, tetapi NIK " + inputNik + " belum didaftarkan di 'master_karyawan' Realtime Database!");
             }
         })
         .catch((error) => {
+            // Selalu kembalikan tombol ke keadaan awal jika terjadi error
             btnSubmit.innerText = "MASUK SISTEM";
             btnSubmit.disabled = false;
-            console.error("Auth error:", error.code, error.message);
-            errorMsg.innerText = "NIK atau password salah / tidak terdaftar!";
+            
+            console.error("Detail Error Login:", error.code, error.message);
+            
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                errorMsg.innerText = "NIK atau password tidak terdaftar!";
+            } else if (error.code === 'auth/invalid-email') {
+                errorMsg.innerText = "Format NIK tidak valid!";
+            } else {
+                errorMsg.innerText = "Gagal login: " + error.message;
+            }
             errorMsg.style.display = 'block';
         });
-}
-
-// --- LOGOUT MANAGEMENT ---
-function logout() {
-    firebase.auth().signOut().then(() => {
-        userAktif = null;
-        document.getElementById('updateForm').reset();
-        document.getElementById('customer_select').innerHTML = '<option value="">-- Pilih Kolektor Dahulu --</option>';
-        document.getElementById('customer_select').disabled = true;
-        switchPage('sectionLogin');
-    }).catch((error) => {
-        console.error("Gagal logout:", error);
-    });
 }

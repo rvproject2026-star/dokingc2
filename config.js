@@ -2,6 +2,7 @@
 const firebaseConfig = {
   apiKey: "AIzaSyCFftvvZzQQFtCkWVT1YvdNaugCxecnv1w",
   authDomain: "doking-c2.firebaseapp.com",
+  databaseURL: "https://doking-c2-default-rtdb.asia-southeast1.firebasedatabase.app/", // ← Jangan sampai tertinggal!
   projectId: "doking-c2",
   storageBucket: "doking-c2.firebasestorage.app",
   messagingSenderId: "37490785481",
