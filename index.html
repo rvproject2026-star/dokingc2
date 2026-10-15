@@ -253,6 +253,7 @@
 
                         <div class="form-card">
                             <label class="form-label">Nama Nasabah / Customer <span class="required">*</span></label>
+                            <!-- ATTRIBUTE ONCHANGE SUDAH DITAMBAHKAN DI SINI -->
                             <select id="customer_select" required disabled onchange="isiOtomatisNoKontrak(this.value)">
                                 <option value="">-- Pilih Kolektor Dahulu --</option>
                             </select>
@@ -319,7 +320,7 @@
         </div>
     </div>
 
-    <!-- 4. HALAMAN CONTROL PANEL PAK SALMAN -->
+    <!-- 4. HALAMAN CONTROL PANEL ARH -->
     <div id="sectionRekapSalman" class="page-section">
         <div class="light-theme-wrapper">
             <div class="light-theme">
@@ -330,7 +331,7 @@
                     </div>
                 </div>
 
-                <!-- FORM UPLOAD EXCEL MASTER NASABAH (UNTUK PAK SALMAN) -->
+                <!-- FORM UPLOAD EXCEL MASTER NASABAH (UNTUK ARH) -->
                 <div class="form-card full-width" style="margin-bottom: 20px; background: #f8fafc; border: 1px dashed var(--primary);">
                     <label class="form-label"><i class="fa-solid fa-file-excel"></i> Upload Master Data Nasabah (.xlsx)</label>
                     <input type="file" id="excelMasterFile" accept=".xlsx, .xls" style="margin-bottom: 10px; width: 100%;">
