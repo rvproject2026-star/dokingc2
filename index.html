@@ -4,17 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Doking Cilegon 2</title>
+    
+    <!-- CSS Dependencies -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Library Firebase (App, Database, dan Auth) -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script> <!-- TAMBAHKAN BARIS INI -->
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-<!-- Script aplikasi kita -->
-<script src="config.js"></script>
-<script src="app.js"></script>
+    <!-- Firebase SDK v8 & Library (Urutan Wajib) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
     <style>
         /* --- PALET WARNA TERANG: BIRU & PUTIH --- */
@@ -196,11 +195,6 @@
         .btn-export:hover { background-color: #15803d; }
         input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
     </style>
-
-    <!-- Firebase & Library Dependencies -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -336,6 +330,15 @@
                     </div>
                 </div>
 
+                <!-- FORM UPLOAD EXCEL MASTER NASABAH (UNTUK PAK SALMAN) -->
+                <div class="form-card full-width" style="margin-bottom: 20px; background: #f8fafc; border: 1px dashed var(--primary);">
+                    <label class="form-label"><i class="fa-solid fa-file-excel"></i> Upload Master Data Nasabah (.xlsx)</label>
+                    <input type="file" id="excelMasterFile" accept=".xlsx, .xls" style="margin-bottom: 10px; width: 100%;">
+                    <button type="button" class="btn btn-submit-form" onclick="uploadMasterExcelKeFirebase()">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Upload & Perbarui Database Nasabah
+                    </button>
+                </div>
+
                 <div class="info-box">
                     <span>Total Rekap Masuk: <strong id="totalNasabah" style="color: var(--primary);">0</strong></span>
                     <span>Terpilih Cetak: <strong id="totalTerpilih" style="color: var(--success);">0</strong></span>
@@ -357,7 +360,7 @@
         </div>
     </div>
 
-    <!-- Panggil file konfigurasi dan logika terpisah -->
+    <!-- Panggil file konfigurasi & aplikasi di bagian paling bawah setelah elemen HTML selesai dirender -->
     <script src="config.js"></script>
     <script src="app.js"></script>
 </body>
