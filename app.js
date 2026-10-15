@@ -250,7 +250,7 @@ function kirimKeFirebase(event) {
     });
 }
 
-// --- 7. UPLOAD MASTER NASABAH DARI EXCEL ---
+// --- 7. UPLOAD MASTER NASABAH DARI EXCEL (FLEKSIBEL) ---
 function uploadMasterExcelKeFirebase() {
     const fileInput = document.getElementById('excelMasterFile');
     if (fileInput.files.length === 0) {
@@ -267,14 +267,22 @@ function uploadMasterExcelKeFirebase() {
             const workbook = XLSX.read(data, { type: 'array' });
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
-            const rows = XLSX.utils.sheet_to_json(worksheet);
             
+            // Menggunakan header: 1 atau mendeteksi baris header secara otomatis
+            const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+            
+            if (rows.length === 0) {
+                alert("File Excel kosong atau format tidak terbaca!");
+                return;
+            }
+
             let structuredData = {};
 
             rows.forEach(row => {
-                let kolektor = (row["KOLEKTOR"] || row["Kolektor"] || "").toString().trim().toUpperCase();
-                let namaCust = (row["NAMA CUSTOMER"] || row["Nama Customer"] || "").toString().trim().toUpperCase();
-                let noKontrak = (row["KONTRAK"] || row["No Kontrak"] || row["kontrak"] || "").toString().trim();
+                // Menangkap berbagai kemungkinan penulisan header di Excel
+                let kolektor = (row["KOLEKTOR"] || row["Kolektor"] || row["kolektor"] || "").toString().trim().toUpperCase();
+                let namaCust = (row["NAMA CUSTOMER"] || row["Nama Customer"] || row["NAMA"] || row["Nama"] || "").toString().trim().toUpperCase();
+                let noKontrak = (row["NO KONTRAK"] || row["No Kontrak"] || row["NO. KONTRAK"] || row["KONTRAK"] || row["Kontrak"] || row["kontrak"] || "").toString().trim();
 
                 if (kolektor && namaCust) {
                     if (!structuredData[kolektor]) {
@@ -282,10 +290,15 @@ function uploadMasterExcelKeFirebase() {
                     }
                     structuredData[kolektor].push({
                         nama: namaCust,
-                        kontrak: noKontrak
+                        kontrak: noKontrak || "-"
                     });
                 }
             });
+
+            if (Object.keys(structuredData).length === 0) {
+                alert("Gagal membaca data. Pastikan baris judul Excel menggunakan: KOLEKTOR, NAMA CUSTOMER, NO KONTRAK.");
+                return;
+            }
 
             database.ref('master_nasabah').set(structuredData, (error) => {
                 if (error) {
@@ -407,8 +420,14 @@ function hitungTerpilih() {
 }
 
 function hapusSemuaDatabase() {
-    if (confirm("⚠️ PERINGATAN: Tindakan ini akan mengosongkan seluruh database pusat. Anda yakin?")) {
-        database.ref('data_docking').remove();
+    if (confirm("⚠️ PERINGATAN: Tindakan ini akan mengosongkan seluruh laporan docking harian. Anda yakin?")) {
+        database.ref('data_docking').remove()
+            .then(() => {
+                alert("Data laporan docking berhasil dibersihkan.");
+            })
+            .catch((error) => {
+                alert("Gagal menghapus data: " + error.message);
+            });
     }
 }
 
