@@ -522,3 +522,14 @@ function downloadExcel() {
 
     XLSX.writeFile(workbook, "Rekap_Sistem_Ruang_Docking_Pusat.xlsx");
 }
+// Tambahkan listener untuk mendeteksi saat aplikasi aktif kembali di WebView
+document.addEventListener("visibilitychange", function() {
+    if (document.visibilityState === "visible") {
+        // Paksa Firebase menyambung kembali saat aplikasi dibuka/fokus lagi
+        database.goOnline();
+        console.log("Aplikasi aktif kembali, menyinkronkan Firebase...");
+    } else {
+        database.goOffline();
+    }
+});
+
