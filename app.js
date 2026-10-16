@@ -10,6 +10,7 @@ let dataInput = {};
 
 // --- 2. MUAT DATA DARI FIREBASE SAAT HALAMAN DIBUKA ---
 window.addEventListener('DOMContentLoaded', () => {
+    // Listener untuk Master Nasabah
     database.ref('master_nasabah').on('value', (snapshot) => {
         if (snapshot.exists()) {
             dataInput = snapshot.val();
@@ -27,6 +28,24 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    // Listener Realtime untuk Data Docking (Otomatis memperbarui halaman Pak Bambang & Live Input)
+    database.ref('data_docking').on('value', (snapshot) => {
+        const dataObjek = snapshot.val();
+        globalDatabaseSnapshot = dataObjek;
+        
+        // Perbarui tampilan secara langsung (Realtime)
+        tampilkanRiwayatSingkat(dataObjek);
+        tampilkanTabelOnlinePakSalman(dataObjek);
+        
+        // Perbarui filter dropdown kolektor jika sedang dipilih
+        const collectorSelect = document.getElementById('collector_select');
+        if (collectorSelect && collectorSelect.value) {
+            filterCustomers(collectorSelect.value);
+        }
+    });
+});
+
 
     database.ref('data_docking').on('value', (snapshot) => {
         const dataObjek = snapshot.val();
