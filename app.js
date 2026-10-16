@@ -522,14 +522,17 @@ function downloadExcel() {
 
     XLSX.writeFile(workbook, "Rekap_Sistem_Ruang_Docking_Pusat.xlsx");
 }
-// Tambahkan listener untuk mendeteksi saat aplikasi aktif kembali di WebView
+// --- PERBAIKAN: Penanganan Visibility Change yang Aman untuk WebView ---
 document.addEventListener("visibilitychange", function() {
     if (document.visibilityState === "visible") {
-        // Paksa Firebase menyambung kembali saat aplikasi dibuka/fokus lagi
-        database.goOnline();
+        // Cukup panggil goOnline tanpa mematikan paksa dengan goOffline()
+        if (typeof database.goOnline === 'function') {
+            database.goOnline();
+        }
         console.log("Aplikasi aktif kembali, menyinkronkan Firebase...");
-    } else {
-        database.goOffline();
     }
+    // JANGAN GUNAKAN database.goOffline() di sini karena sering membuat 
+    // WebView kehilangan koneksi permanen saat aplikasi minimize sesaat.
 });
+
 
