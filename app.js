@@ -7,6 +7,18 @@ const database = firebase.database();
 let globalDatabaseSnapshot = null;
 let userAktif = null;
 let dataInput = {};
+// --- TAMBAHAN: Pemantau Koneksi Otomatis untuk WebView ---
+database.ref(".info/connected").on("value", (snapshot) => {
+    if (snapshot.val() === true) {
+        console.log("Koneksi Firebase tersambung kembali.");
+    } else {
+        console.log("Koneksi terputus, mencoba menyambungkan ulang...");
+        if (typeof database.goOnline === 'function') {
+            database.goOnline();
+        }
+    }
+});
+
 
 // --- 2. MUAT DATA DARI FIREBASE SAAT HALAMAN DIBUKA ---
 window.addEventListener('DOMContentLoaded', () => {
@@ -522,6 +534,16 @@ function downloadExcel() {
 
     XLSX.writeFile(workbook, "Rekap_Sistem_Ruang_Docking_Pusat.xlsx");
 }
+function muatUlangKoneksi() {
+    if (typeof showLoading === 'function') showLoading("Menghubungkan ulang...");
+    database.goOffline();
+    setTimeout(() => {
+        database.goOnline();
+        if (typeof hideLoading === 'function') hideLoading();
+        window.location.reload(); // Memuat ulang halaman WebView secara bersih
+    }, 1000);
+}
+
 // --- PERBAIKAN: Penanganan Visibility Change yang Aman untuk WebView ---
 document.addEventListener("visibilitychange", function() {
     if (document.visibilityState === "visible") {
