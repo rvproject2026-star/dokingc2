@@ -496,3 +496,56 @@ function downloadExcel() {
 
     XLSX.writeFile(workbook, "Rekap_Sistem_Ruang_Docking_Pusat.xlsx");
 }
+// --- PENGIRIMAN DATA KE FIREBASE DENGAN POP-UP & LOADING C2 ---
+function kirimKeFirebase(event) {
+    event.preventDefault();
+    const btn = document.getElementById('btnSubmit');
+    const collector = document.getElementById('collector_select').value;
+    const customerSelect = document.getElementById('customer_select');
+    const selectedOption = customerSelect.options[customerSelect.selectedIndex];
+    
+    // Ambil nama customer asli dari dataset option yang dipilih
+    const customerName = selectedOption.dataset.namaCustomer || selectedOption.text || "Nasabah";
+    const nomorKontrak = document.getElementById('no_kontrak').value;
+
+    if (!customerName || !nomorKontrak) {
+        alert("Silakan pilih nasabah dan kontrak dengan benar!");
+        return;
+    }
+
+    // Tampilkan animasi loading C2 saat proses kirim berlangsung
+    showLoading("Mengirim Laporan ke Pak Bambang...");
+    btn.disabled = true;
+    btn.innerText = "Mengirim...";
+    
+    let objekData = {
+        namaCustomer: customerName.toUpperCase(),
+        noKontrak: nomorKontrak.toString().trim(),
+        remedialMk2: collector.toUpperCase(),
+        progresDocking: document.getElementById('prediksi_sukses').value,
+        tglJb: document.getElementById('tgl_prediksi_jb').value,
+        dlq: document.getElementById('deliquency').value.toUpperCase(),
+        ansus: document.getElementById('detail_kasus').value,
+        inputBy: userAktif ? userAktif.nama : "Karyawan"
+    };
+
+    database.ref('data_docking').push(objekData, function(error) {
+        // Sembunyikan loading
+        hideLoading();
+        btn.disabled = false;
+        btn.innerText = "Kirim Laporan";
+
+        if (error) {
+            alert("Gagal mengirim data: " + error.message);
+        } else {
+            // POP-UP NOTIFIKASI SUKSES DENGAN KETERANGAN KE PAK BAMBANG
+            alert(`✅ Laporan untuk nasabah "${customerName.toUpperCase()}" (Kontrak: ${nomorKontrak}) telah berhasil dikirim ke Pak Bambang!`);
+            
+            // Reset form
+            document.getElementById('updateForm').reset();
+            document.getElementById('customer_select').innerHTML = '<option value="">-- Pilih Kolektor Dahulu --</option>';
+            document.getElementById('customer_select').disabled = true;
+            document.getElementById('no_kontrak').value = '';
+        }
+    });
+}
