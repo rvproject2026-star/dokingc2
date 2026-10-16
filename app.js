@@ -459,79 +459,69 @@ function hapusSemuaDatabase() {
     }
 }
 
-// --- 9. DOWNLOAD EXCEL REKAP (SESUAI STRUKTUR FILE EXCEL MASTER + INPUTAN APK) ---
+// --- 9. DOWNLOAD EXCEL REKAP ---
 function downloadExcel() {
     let dataSudahInputExcel = [];
-    let dataBelumInputExcel = [];
-    let kontrakSudahInputMap = {};
+    let kontrakSudahInputList = [];
+    let indexSudah = 1;
 
     const checkboxes = document.querySelectorAll('.chk-nasabah:checked');
     
-    // 1. Kumpulkan data laporan yang dicentang di halaman Pak Bambang
     if (globalDatabaseSnapshot && checkboxes.length > 0) {
         checkboxes.forEach(cb => {
             let key = cb.value;
             let item = globalDatabaseSnapshot[key];
-            if (item && item.noKontrak) {
-                let kontrakClean = item.noKontrak.toString().trim();
-                kontrakSudahInputMap[kontrakClean] = item;
+            if (item) {
+                if (item.noKontrak) kontrakSudahInputList.push(item.noKontrak.toString().trim());
+                dataSudahInputExcel.push({
+                    "NO": indexSudah++,
+                    "NAMA CUSTOMER": item.namaCustomer,
+                    "NO KONTRAK": item.noKontrak || "-",
+                    "REMEDIAL / MK2": item.remedialMk2,
+                    "JANJI BAYAR": item.tglJb,
+                    "DLQ": item.dlq,
+                    "DETAIL KASUS (ANSUS)": item.ansus,
+                    "PREDIKSI": item.progresDocking,
+                    "INPUT OLEH": item.inputBy || "Karyawan"
+                });
             }
         });
     }
 
-    // 2. Loop data master nasabah untuk menyusun baris sesuai format asli Excel
-    if (dataInput && Object.keys(dataInput).length > 0) {
+    let dataBelumInputExcel = [];
+    let indexBelum = 1;
+
+    if (dataInput) {
         Object.keys(dataInput).forEach(kolektor => {
             dataInput[kolektor].forEach(nasabahObj => {
                 let kontrakClean = (nasabahObj.kontrak || "").toString().trim();
-                
-                // Salin seluruh struktur kolom asli dari file Excel (rawRow) jika ada
-                let baseRow = nasabahObj.rawRow ? { ...nasabahObj.rawRow } : {
-                    "NO KONTRAK": nasabahObj.kontrak,
-                    "NAMA CUSTOMER": nasabahObj.nama,
-                    "KOLEKTOR": kolektor
-                };
-
-                // Jika nomor kontrak ini sudah diinput melalui aplikasi, perbarui kolom target
-                if (kontrakSudahInputMap[kontrakClean]) {
-                    let inputItem = kontrakSudahInputMap[kontrakClean];
-                    
-                    baseRow["JB"] = inputItem.tglJb || baseRow["JB"] || "";
-                    baseRow["PRED"] = inputItem.progresDocking || baseRow["PRED"] || "";
-                    baseRow["DELQ"] = inputItem.dlq || baseRow["DELQ"] || "";
-                    baseRow["ANSUS"] = inputItem.ansus || baseRow["ANSUS"] || "";
-
-                    dataSudahInputExcel.push(baseRow);
-                } else {
-                    dataBelumInputExcel.push(baseRow);
+                if (!kontrakSudahInputList.includes(kontrakClean)) {
+                    dataBelumInputExcel.push({
+                        "NO": indexBelum++,
+                        "NAMA CUSTOMER": nasabahObj.nama,
+                        "NO KONTRAK": nasabahObj.kontrak,
+                        "REMEDIAL / MK2": kolektor,
+                        "STATUS KETERANGAN": "BELUM INPUT DATA DOCKING"
+                    });
                 }
             });
         });
     }
 
-    if (dataSudahInputExcel.length === 0 && dataBelumInputExcel.length === 0) {
-        alert("Tidak ada data untuk diunduh!");
-        return;
-    }
-
     const workbook = XLSX.utils.book_new();
 
-    // Buat Sheet "Sudah Input" dengan format struktur master lengkap + hasil inputan
     if (dataSudahInputExcel.length > 0) {
         const worksheetSudah = XLSX.utils.json_to_sheet(dataSudahInputExcel);
         XLSX.utils.book_append_sheet(workbook, worksheetSudah, "Sudah Input");
     }
 
-    // Buat Sheet "Belum Input" sesuai master asli
     if (dataBelumInputExcel.length > 0) {
         const worksheetBelum = XLSX.utils.json_to_sheet(dataBelumInputExcel);
         XLSX.utils.book_append_sheet(workbook, worksheetBelum, "Belum Input");
     }
 
-    // Unduh file Excel
     XLSX.writeFile(workbook, "Rekap_Sistem_Ruang_Docking_Pusat.xlsx");
 }
-
 // Tambahkan listener untuk mendeteksi saat aplikasi aktif kembali di WebView
 document.addEventListener("visibilitychange", function() {
     if (document.visibilityState === "visible") {
