@@ -1,269 +1,217 @@
-// --- 1. INISIALISASI FIREBASE ---
+// ==========================================
+// KODE LENGKAP APP.JS - RUANG DOCKING C2
+// ==========================================
+
+// --- 1. INISIALISASI KONFIGURASI FIREBASE ---
+// (Ganti dengan konfigurasi Firebase Anda)
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+
+// Inisialisasi Firebase
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
 const database = firebase.database();
 
+// Variabel Global
 let globalDatabaseSnapshot = null;
-let userAktif = null;
-let dataInput = {};
+let dataInput = {}; 
 
-// --- 2. MUAT DATA DARI FIREBASE ---
-window.addEventListener('DOMContentLoaded', () => {
-    database.ref('master_nasabah').on('value', (snapshot) => {
-        if (snapshot.exists()) {
-            dataInput = snapshot.val();
-            const collectorSelect = document.getElementById('collector_select');
-            if (collectorSelect) {
-                const currentVal = collectorSelect.value;
-                collectorSelect.innerHTML = '<option value="">-- Pilih Nama Kolektor --</option>';
-                Object.keys(dataInput).forEach(collector => {
-                    let option = document.createElement('option');
-                    option.value = collector;
-                    option.text = collector;
-                    collectorSelect.appendChild(option);
-                });
-                if (currentVal) collectorSelect.value = currentVal;
-            }
-        }
-    });
-
-    database.ref('data_docking').on('value', (snapshot) => {
-        const dataObjek = snapshot.val();
-        globalDatabaseSnapshot = dataObjek;
+// --- 2. FITUR EFEK SUARA & GETAR (VIBRATION & AUDIO) ---
+function playNotificationSound() {
+    try {
+        // Suara notifikasi singkat
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
         
-        tampilkanRiwayatSingkat(dataObjek);
-        tampilkanTabelOnlinePakSalman(dataObjek);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // Nada D5
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // Nada A5
         
-        const currentCollector = document.getElementById('collector_select').value;
-        if (currentCollector) {
-            filterCustomers(currentCollector);
-        }
-    });
-});
-
-// --- 3. LOGIKA LOGIN ---
-function prosesLogin(event) {
-    event.preventDefault();
-    
-    const inputNik = document.getElementById('password').value.trim();
-    const errorMsg = document.getElementById('errorMsg');
-    const btnSubmit = document.querySelector('.btn-submit');
-    
-    if (!inputNik) {
-        errorMsg.innerText = "Masukkan NIK terlebih dahulu!";
-        errorMsg.style.display = 'block';
-        return;
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+    } catch (e) {
+        console.log("Audio not supported or blocked by browser.");
     }
+}
 
-    btnSubmit.innerText = "MEMVERIFIKASI...";
-    btnSubmit.disabled = true;
-    errorMsg.style.display = 'none';
+function triggerVibration() {
+    if ("vibrate" in navigator) {
+        // Pola getar: 200ms - jeda 100ms - 200ms
+        navigator.vibrate([200, 100, 200]);
+    }
+}
 
-    const emailSemu = `${inputNik}@doking.com`;
-    const passwordSemu = inputNik;
-
-    let isFinished = false;
-    const timeoutId = setTimeout(() => {
-        if (!isFinished) {
-            isFinished = true;
-            btnSubmit.innerText = "MASUK SISTEM";
-            btnSubmit.disabled = false;
-            errorMsg.innerText = "Koneksi ke Firebase Timeout. Periksa jaringan Anda.";
-            errorMsg.style.display = 'block';
-        }
-    }, 6000);
-
-    firebase.auth().signInWithEmailAndPassword(emailSemu, passwordSemu)
-        .then(() => {
-            return database.ref('master_karyawan/' + inputNik).once('value');
-        })
-        .then((snapshot) => {
-            if (isFinished) return;
-            isFinished = true;
-            clearTimeout(timeoutId);
-
-            btnSubmit.innerText = "MASUK SISTEM";
-            btnSubmit.disabled = false;
-
-            if (snapshot.exists()) {
-                userAktif = snapshot.val();
-                userAktif.nik = inputNik;
-                errorMsg.style.display = 'none';
-                document.getElementById('password').value = '';
-
-                document.getElementById('userNama').innerText = userAktif.nama;
-                document.getElementById('userJabatan').innerText = userAktif.jabatan;
-                document.getElementById('userFoto').src = userAktif.foto || 'default.png';
-
-                const btnAksiProfil = document.getElementById('btnAksiProfil');
-                if (userAktif.khusus) {
-                    btnAksiProfil.innerHTML = '<i class="fa-solid fa-sliders"></i> REKAP HASIL DOCKING';
-                } else {
-                    btnAksiProfil.innerHTML = '<i class="fa-solid fa-pen-to-square"></i> ISI DATA DOCKING';
+// --- 3. ANIMASI LOADING C2 & POP-UP INTERAKTIF ---
+function showLoading(pesan = "Memproses Data C2...") {
+    let loader = document.getElementById('c2LoaderOverlay');
+    if (!loader) {
+        loader = document.createElement('div');
+        loader.id = 'c2LoaderOverlay';
+        loader.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 9999; color: white;
+            font-family: Arial, sans-serif;
+        `;
+        loader.innerHTML = `
+            <div style="font-size: 48px; font-weight: bold; color: #4A90E2; animation: bounce 1s infinite;">C2</div>
+            <div id="c2LoaderText" style="margin-top: 15px; font-size: 16px;">${pesan}</div>
+            <style>
+                @keyframes bounce {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-15px); }
                 }
-
-                switchPage('sectionProfil');
-            } else {
-                errorMsg.innerText = "⚠️ Akun Auth valid, tapi NIK tidak ada di database 'master_karyawan'!";
-                errorMsg.style.display = 'block';
-            }
-        })
-        .catch((error) => {
-            if (isFinished) return;
-            isFinished = true;
-            clearTimeout(timeoutId);
-
-            btnSubmit.innerText = "MASUK SISTEM";
-            btnSubmit.disabled = false;
-            
-            errorMsg.innerText = "Gagal: " + error.message;
-            errorMsg.style.display = 'block';
-        });
-}
-
-// --- 4. NAVIGASI ---
-function switchPage(pageId) {
-    document.querySelectorAll('.page-section').forEach(section => {
-        section.classList.remove('active');
-    });
-    document.getElementById(pageId).classList.add('active');
-}
-
-function bukaHalamanKerja() {
-    if (userAktif && userAktif.khusus) {
-        switchPage('sectionRekapSalman');
+            </style>
+        `;
+        document.body.appendChild(loader);
     } else {
-        document.getElementById('karyawanHeaderTitle').innerText = "Ruang Docking — " + userAktif.nama.toUpperCase();
-        switchPage('sectionInputDocking');
+        document.getElementById('c2LoaderText').innerText = pesan;
+        loader.style.display = 'flex';
     }
 }
 
-function logout() {
-    firebase.auth().signOut().then(() => {
-        userAktif = null;
-        document.getElementById('updateForm').reset();
-        document.getElementById('customer_select').innerHTML = '<option value="">-- Pilih Kolektor Dahulu --</option>';
-        document.getElementById('customer_select').disabled = true;
-        switchPage('sectionLogin');
-    });
+function hideLoading() {
+    const loader = document.getElementById('c2LoaderOverlay');
+    if (loader) loader.style.display = 'none';
 }
 
-// --- 5. FILTER & PENANGANAN KONTRAK GANDA (BUG 1 & BUG 3) ---
-function filterCustomers(selectedCollector) {
-    const customerSelect = document.getElementById('customer_select');
-    const noKontrakInput = document.getElementById('no_kontrak');
-    customerSelect.innerHTML = '<option value="">-- Pilih Nama Nasabah & Kontrak --</option>';
-    noKontrakInput.value = '';
+// --- 4. CARI & TAMPILKAN NASABAH BERDASARKAN KOLEKTOR ---
+function muatDaftarNasabah() {
+    const selectKolektor = document.getElementById('selectKolektor');
+    const selectNasabah = document.getElementById('selectNasabah');
+    
+    if (!selectKolektor || !selectNasabah) return;
+    
+    const kolektorPilihan = selectKolektor.value.toUpperCase();
+    selectNasabah.innerHTML = '<option value="">-- Pilih Nasabah --</option>';
 
-    if (selectedCollector === "" || !dataInput[selectedCollector]) {
-        customerSelect.disabled = true;
-        return;
-    }
-
-    // Kumpulkan kontrak yang sudah diinput agar tidak muncul lagi
-    let kontrakSudahInput = [];
-    if (globalDatabaseSnapshot) {
-        Object.keys(globalDatabaseSnapshot).forEach(key => {
-            let item = globalDatabaseSnapshot[key];
-            if (item.remedialMk2 && item.remedialMk2.toUpperCase() === selectedCollector.toUpperCase()) {
-                if (item.noKontrak) {
-                    kontrakSudahInput.push(item.noKontrak.toString().trim());
-                }
-            }
+    if (dataInput[kolektorPilihan]) {
+        dataInput[kolektorPilihan].forEach(item => {
+            let opt = document.createElement('option');
+            opt.value = item.kontrak;
+            opt.textContent = `${item.nama} (${item.kontrak})`;
+            selectNasabah.appendChild(opt);
         });
     }
-
-    // Filter daftar nasabah yang belum diinput berdasarkan nomor kontraknya yang unik
-    let listTersedia = dataInput[selectedCollector].filter(cust => {
-        let kontrakClean = (cust.kontrak || "").toString().trim();
-        return !kontrakSudahInput.includes(kontrakClean);
-    });
-
-    if (listTersedia.length === 0) {
-        customerSelect.innerHTML = '<option value="">🎉 Semua nasabah kolektor ini sudah selesai!</option>';
-        customerSelect.disabled = true;
-        return;
-    }
-
-    // Tampilkan opsi dengan format: NAMA (KONTRAK: XXXXX) agar jelas jika ada nama kembar/kontrak ganda
-    listTersedia.forEach(custObj => {
-        let option = document.createElement('option');
-        // Menyimpan nomor kontrak di atribut value agar mudah dipanggil otomatis
-        option.value = custObj.kontrak; 
-        option.text = `${custObj.nama} — Kontrak: ${custObj.kontrak}`;
-        // Simpan nama asli di dataset untuk diambil nanti
-        option.dataset.namaCustomer = custObj.nama;
-        customerSelect.appendChild(option);
-    });
-    customerSelect.disabled = false;
 }
 
-function isiOtomatisNoKontrak(kontrakTerpilih) {
-    const customerSelect = document.getElementById('customer_select');
-    const noKontrakInput = document.getElementById('no_kontrak');
-    
-    if (!kontrakTerpilih) {
-        noKontrakInput.value = '';
+// --- 5. KIRIM LAPORAN KOLEKTOR KE FIREBASE ---
+function kirimLaporan() {
+    const kolektor = document.getElementById('selectKolektor')?.value;
+    const noKontrak = document.getElementById('selectNasabah')?.value;
+    const progres = document.getElementById('selectProgres')?.value; // PRED
+    const tglJb = document.getElementById('inputTglJb')?.value; // JB
+    const dlq = document.getElementById('inputDlq')?.value; // DELQ
+    const ansus = document.getElementById('inputAnsus')?.value; // ANSUS
+    const catatan = document.getElementById('inputCatatan')?.value;
+
+    if (!kolektor || !noKontrak || !progres) {
+        alert("Mohon lengkapi Kolektor, Nasabah, dan Progres Docking!");
         return;
     }
 
-    // Otomatis isi nomor kontrak sesuai pilihan dropdown yang spesifik
-    noKontrakInput.value = kontrakTerpilih;
-}
+    // Ambil nama nasabah dari pilihan
+    const selectNasabah = document.getElementById('selectNasabah');
+    const namaNasabah = selectNasabah.options[selectNasabah.selectedIndex].text.split(' (')[0];
 
-// --- 6. PENGIRIMAN DATA KE FIREBASE (BUG 2) ---
-function kirimKeFirebase(event) {
-    event.preventDefault();
-    const btn = document.getElementById('btnSubmit');
-    const collector = document.getElementById('collector_select').value;
-    const customerSelect = document.getElementById('customer_select');
-    const selectedOption = customerSelect.options[customerSelect.selectedIndex];
-    
-    // Ambil nama customer asli dari dataset option yang dipilih
-    const customerName = selectedOption.dataset.namaCustomer || "";
-    const nomorKontrak = document.getElementById('no_kontrak').value;
+    showLoading("Mengirim Laporan ke Pak Bambang...");
 
-    if (!customerName || !nomorKontrak) {
-        alert("Silakan pilih nasabah dan kontrak dengan benar!");
-        return;
-    }
-
-    btn.disabled = true;
-    btn.innerText = "Mengirim...";
-    
-    let objekData = {
-        namaCustomer: customerName.toUpperCase(),
-        noKontrak: nomorKontrak.toString().trim(),
-        remedialMk2: collector.toUpperCase(),
-        progresDocking: document.getElementById('prediksi_sukses').value,
-        tglJb: document.getElementById('tgl_prediksi_jb').value,
-        dlq: document.getElementById('deliquency').value.toUpperCase(),
-        ansus: document.getElementById('detail_kasus').value,
-        inputBy: userAktif ? userAktif.nama : "Karyawan"
+    const payload = {
+        kolektor: kolektor,
+        noKontrak: noKontrak,
+        namaNasabah: namaNasabah,
+        progresDocking: progres, // Mengisi PRED
+        tglJb: tglJb || "-",      // Mengisi JB
+        dlq: dlq || "-",          // Mengisi DELQ
+        ansus: ansus || "-",      // Mengisi ANSUS
+        catatan: catatan || "-",
+        waktuKirim: new Date().toLocaleString('id-ID')
     };
 
-    database.ref('data_docking').push(objekData, function(error) {
-        btn.disabled = false;
-        btn.innerText = "Kirim Laporan";
+    database.ref('data_docking').push(payload, (error) => {
+        hideLoading();
         if (error) {
-            alert("Gagal mengirim data: " + error.message);
+            alert("❌ Gagal mengirim laporan: " + error.message);
         } else {
-            alert("Data " + customerName + " berhasil tersimpan!");
-            document.getElementById('updateForm').reset();
-            document.getElementById('customer_select').innerHTML = '<option value="">-- Pilih Kolektor Dahulu --</option>';
-            document.getElementById('customer_select').disabled = true;
+            // Sensasi Suara & Getar saat Berhasil
+            triggerVibration();
+            playNotificationSound();
+
+            alert(`✅ Laporan untuk nasabah "${namaNasabah}" (Kontrak: ${noKontrak}) telah berhasil dikirim ke Pak Bambang!`);
+            
+            // Reset Form Input
+            if (document.getElementById('formDocking')) {
+                document.getElementById('formDocking').reset();
+            }
         }
     });
 }
 
-// --- 7. UPLOAD EXCEL MASTER NASABAH ---
+// --- 6. LISTEN DATA REALTIME DI CONTROL PANEL PAK BAMBANG ---
+function inisialisasiRealtimeListener() {
+    const tabelBody = document.getElementById('tabelRekapBody');
+    if (!tabelBody) return;
+
+    database.ref('data_docking').on('value', (snapshot) => {
+        globalDatabaseSnapshot = snapshot.val();
+        tabelBody.innerHTML = '';
+
+        if (!globalDatabaseSnapshot) {
+            tabelBody.innerHTML = '<tr><td colspan="9" style="text-align:center;">Belum ada data laporan masuk.</td></tr>';
+            return;
+        }
+
+        let nomor = 1;
+        Object.keys(globalDatabaseSnapshot).forEach(key => {
+            let item = globalDatabaseSnapshot[key];
+            let row = document.createElement('tr');
+            row.innerHTML = `
+                <td><input type="checkbox" class="chk-nasabah" value="${key}"></td>
+                <td>${nomor++}</td>
+                <td>${item.kolektor || '-'}</td>
+                <td>${item.namaNasabah || '-'}</td>
+                <td>${item.noKontrak || '-'}</td>
+                <td>${item.progresDocking || '-'}</td>
+                <td>${item.tglJb || '-'}</td>
+                <td>${item.dlq || '-'}</td>
+                <td>${item.ansus || '-'}</td>
+            `;
+            tabelBody.appendChild(row);
+        });
+    });
+
+    // Ambil Master Data Nasabah jika ada
+    database.ref('master_nasabah').once('value', (snapshot) => {
+        if (snapshot.exists()) {
+            dataInput = snapshot.val();
+        }
+    });
+}
+
+// --- 7. UPLOAD EXCEL MASTER NASABAH (MENYIMPAN SELURUH STRUKTUR 52 KOLOM ASLI) ---
 function uploadMasterExcelKeFirebase() {
     const fileInput = document.getElementById('excelMasterFile');
-    if (fileInput.files.length === 0) {
-        alert("Silakan pilih file Excel terlebih dahulu!");
+    if (!fileInput || fileInput.files.length === 0) {
+        alert("Silakan pilih file Excel master terlebih dahulu!");
         return;
     }
+
+    showLoading("Memproses & Mengunggah File Excel...");
 
     const file = fileInput.files[0];
     const reader = new FileReader();
@@ -275,8 +223,9 @@ function uploadMasterExcelKeFirebase() {
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
             const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-            
+
             if (rows.length === 0) {
+                hideLoading();
                 alert("File Excel kosong atau format tidak terbaca!");
                 return;
             }
@@ -286,7 +235,7 @@ function uploadMasterExcelKeFirebase() {
             rows.forEach(row => {
                 let kolektor = (row["KOLEKTOR"] || row["Kolektor"] || row["kolektor"] || "").toString().trim().toUpperCase();
                 let namaCust = (row["NAMA CUSTOMER"] || row["Nama Customer"] || row["NAMA"] || row["Nama"] || "").toString().trim().toUpperCase();
-                let noKontrak = (row["NO KONTRAK"] || row["No Kontrak"] || row["NO. KONTRAK"] || row["KONTRAK"] || row["Kontrak"] || row["kontrak"] || "").toString().trim();
+                let noKontrak = (row["NO KONTRAK"] || row["No Kontrak"] || row["NO. KONTRAK"] || row["KONTRAK"] || row["Kontrak"] || "").toString().trim();
 
                 if (kolektor && namaCust && noKontrak) {
                     if (!structuredData[kolektor]) {
@@ -294,26 +243,31 @@ function uploadMasterExcelKeFirebase() {
                     }
                     structuredData[kolektor].push({
                         nama: namaCust,
-                        kontrak: noKontrak
+                        kontrak: noKontrak,
+                        rawRow: row // Menyimpan seluruh 52 kolom asli Excel
                     });
                 }
             });
 
             if (Object.keys(structuredData).length === 0) {
-                alert("Gagal membaca data. Pastikan baris judul Excel menggunakan: KOLEKTOR, NAMA CUSTOMER, NO KONTRAK.");
+                hideLoading();
+                alert("Gagal membaca data! Pastikan header kolom Excel berisi: KOLEKTOR, NAMA CUSTOMER, NO KONTRAK.");
                 return;
             }
 
             database.ref('master_nasabah').set(structuredData, (error) => {
+                hideLoading();
                 if (error) {
                     alert("Gagal menyimpan ke Firebase: " + error.message);
                 } else {
-                    alert("✅ Berhasil! Master data nasabah telah diperbarui di Firebase.");
+                    dataInput = structuredData;
+                    alert("✅ Berhasil! Master data nasabah telah disimpan di Firebase.");
                     fileInput.value = "";
                 }
             });
 
         } catch (err) {
+            hideLoading();
             console.error(err);
             alert("Terjadi kesalahan saat membaca file Excel: " + err.message);
         }
@@ -322,166 +276,68 @@ function uploadMasterExcelKeFirebase() {
     reader.readAsArrayBuffer(file);
 }
 
-// --- 8. TABEL LIVE HISTORY & PAK SALMAN ---
-function tampilkanRiwayatSingkat(dataObjek) {
-    const tbody = document.getElementById('liveHistoryBody');
-    const badgeCount = document.getElementById('liveCount');
-    
-    if (!dataObjek) {
-        badgeCount.textContent = "0 Terinput";
-        tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Belum ada input masuk hari ini.</td></tr>';
-        return;
-    }
-
-    let keys = Object.keys(dataObjek);
-    badgeCount.textContent = keys.length + " Terinput";
-
-    let htmlString = "";
-    let counter = 1;
-
-    keys.reverse().forEach(key => {
-        let item = dataObjek[key];
-        let badgeClass = 'status-pending';
-        if (item.progresDocking === 'SELESAI') badgeClass = 'status-selesai';
-        if (item.progresDocking === 'TIDAK SELESAI') badgeClass = 'status-tidak';
-
-        htmlString += `<tr>
-            <td style="text-align: center; font-weight: bold; color: var(--text-muted);">${counter++}</td>
-            <td><strong>${item.namaCustomer}</strong><br><small style="color:var(--text-muted)">Kontrak: ${item.noKontrak}</small></td>
-            <td>${item.remedialMk2}</td>
-            <td><span class="badge-status ${badgeClass}">${item.progresDocking}</span></td>
-        </tr>`;
-    });
-    tbody.innerHTML = htmlString;
+// --- 8. FITUR PILIH / CENTANG SEMUA CHECKBOX ---
+function toggleSelectAll(masterCheckbox) {
+    const checkboxes = document.querySelectorAll('.chk-nasabah');
+    checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
 }
 
-function tampilkanTabelOnlinePakSalman(dataObjek) {
-    const wrapper = document.getElementById('tableWrapper');
-    
-    if (!dataObjek) {
-        document.getElementById('totalNasabah').textContent = "0";
-        document.getElementById('totalTerpilih').textContent = "0";
-        wrapper.innerHTML = '<div class="empty-state">Belum ada pengiriman data dari kolektor.</div>';
-        return;
-    }
-
-    let keys = Object.keys(dataObjek);
-    document.getElementById('totalNasabah').textContent = keys.length;
-    document.getElementById('totalTerpilih').textContent = keys.length;
-
-    let tableHtml = `
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width: 50px; text-align:center;">PILIH</th>
-                        <th style="width: 50px; text-align:center;">NO</th>
-                        <th>NAMA CUSTOMER</th>
-                        <th>NO KONTRAK</th>
-                        <th>REMEDIAL / MK2</th>
-                        <th>TGL PREDIKSI JB</th>
-                        <th>DLQ</th>
-                        <th>DETAIL KASUS (ANSUS)</th>
-                        <th>PREDIKSI KELAYAKAN</th>
-                        <th>INPUT OLEH</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-
-    let counter = 1;
-    for (let key in dataObjek) {
-        let item = dataObjek[key];
-        let badgeClass = 'status-pending';
-        if (item.progresDocking === 'SELESAI') badgeClass = 'status-selesai';
-        if (item.progresDocking === 'TIDAK SELESAI') badgeClass = 'status-tidak';
-
-        tableHtml += `
-            <tr>
-                <td style="text-align:center;">
-                    <input type="checkbox" class="chk-nasabah" value="${key}" checked onchange="hitungTerpilih()">
-                </td>
-                <td style="text-align:center; color: var(--text-muted);">${counter++}</td>
-                <td><strong style="color: var(--text-main);">${item.namaCustomer}</strong></td>
-                <td style="color: #475569; font-weight: 600;">${item.noKontrak || "-"}</td>
-                <td>${item.remedialMk2}</td>
-                <td style="color: var(--primary); font-weight: 600;">${item.tglJb}</td>
-                <td style="font-weight: 600;">${item.dlq}</td>
-                <td style="max-width: 240px; white-space: normal; word-wrap: break-word;">${item.ansus}</td>
-                <td><span class="badge-status ${badgeClass}">${item.progresDocking}</span></td>
-                <td style="color: var(--primary); font-weight: 600;">${item.inputBy || 'Karyawan'}</td>
-            </tr>
-        `;
-    }
-
-    tableHtml += `</tbody></table></div>`;
-    wrapper.innerHTML = tableHtml;
-}
-
-function hitungTerpilih() {
-    const checkedCount = document.querySelectorAll('.chk-nasabah:checked').length;
-    document.getElementById('totalTerpilih').textContent = checkedCount;
-}
-
-function hapusSemuaDatabase() {
-    if (confirm("⚠️ PERINGATAN: Tindakan ini akan mengosongkan seluruh laporan docking harian. Anda yakin?")) {
-        database.ref('data_docking').remove()
-            .then(() => {
-                alert("Data laporan docking berhasil dibersihkan.");
-            })
-            .catch((error) => {
-                alert("Gagal menghapus data: " + error.message);
-            });
-    }
-}
-
-// --- 9. DOWNLOAD EXCEL REKAP ---
+// --- 9. DOWNLOAD EXCEL REKAP (SESUAI STRUKTUR MASTER EXCEL + INPUTAN APK) ---
 function downloadExcel() {
     let dataSudahInputExcel = [];
-    let kontrakSudahInputList = [];
-    let indexSudah = 1;
+    let dataBelumInputExcel = [];
+    let kontrakSudahInputMap = {};
 
     const checkboxes = document.querySelectorAll('.chk-nasabah:checked');
-    
+
+    // Kumpulkan data laporan dari Firebase yang dicentang
     if (globalDatabaseSnapshot && checkboxes.length > 0) {
         checkboxes.forEach(cb => {
             let key = cb.value;
             let item = globalDatabaseSnapshot[key];
-            if (item) {
-                if (item.noKontrak) kontrakSudahInputList.push(item.noKontrak.toString().trim());
-                dataSudahInputExcel.push({
-                    "NO": indexSudah++,
-                    "NAMA CUSTOMER": item.namaCustomer,
-                    "NO KONTRAK": item.noKontrak || "-",
-                    "REMEDIAL / MK2": item.remedialMk2,
-                    "TGL JB": item.tglJb,
-                    "DLQ": item.dlq,
-                    "DETAIL KASUS (ANSUS)": item.ansus,
-                    "PREDIKSI": item.progresDocking,
-                    "INPUT OLEH": item.inputBy || "Karyawan"
-                });
+            if (item && item.noKontrak) {
+                let kontrakClean = item.noKontrak.toString().trim();
+                kontrakSudahInputMap[kontrakClean] = item;
             }
         });
     }
 
-    let dataBelumInputExcel = [];
-    let indexBelum = 1;
-
-    Object.keys(dataInput).forEach(kolektor => {
-        dataInput[kolektor].forEach(nasabahObj => {
-            let kontrakClean = (nasabahObj.kontrak || "").toString().trim();
-            if (!kontrakSudahInputList.includes(kontrakClean)) {
-                dataBelumInputExcel.push({
-                    "NO": indexBelum++,
-                    "NAMA CUSTOMER": nasabahObj.nama,
+    // Gabungkan dengan Master Data untuk mencetak kolom Excel asli
+    if (dataInput && Object.keys(dataInput).length > 0) {
+        Object.keys(dataInput).forEach(kolektor => {
+            dataInput[kolektor].forEach(nasabahObj => {
+                let kontrakClean = (nasabahObj.kontrak || "").toString().trim();
+                
+                // Ambil seluruh kolom asli dari Master Excel
+                let baseRow = nasabahObj.rawRow ? { ...nasabahObj.rawRow } : {
                     "NO KONTRAK": nasabahObj.kontrak,
-                    "REMEDIAL / MK2": kolektor,
-                    "STATUS KETERANGAN": "BELUM INPUT DATA DOCKING"
-                });
-            }
-        });
-    });
+                    "NAMA CUSTOMER": nasabahObj.nama,
+                    "KOLEKTOR": kolektor
+                };
 
+                if (kontrakSudahInputMap[kontrakClean]) {
+                    let inputItem = kontrakSudahInputMap[kontrakClean];
+
+                    // Timpa / Isi kolom sesuai inputan dari APK
+                    baseRow["JB"] = inputItem.tglJb || baseRow["JB"] || "";
+                    baseRow["PRED"] = inputItem.progresDocking || baseRow["PRED"] || "";
+                    baseRow["DELQ"] = inputItem.dlq || baseRow["DELQ"] || "";
+                    baseRow["ANSUS"] = inputItem.ansus || baseRow["ANSUS"] || "";
+
+                    dataSudahInputExcel.push(baseRow);
+                } else {
+                    dataBelumInputExcel.push(baseRow);
+                }
+            });
+        });
+    }
+
+    if (dataSudahInputExcel.length === 0 && dataBelumInputExcel.length === 0) {
+        alert("Tidak ada data untuk diunduh!");
+        return;
+    }
+
+    // Buat file Workbook Excel
     const workbook = XLSX.utils.book_new();
 
     if (dataSudahInputExcel.length > 0) {
@@ -494,58 +350,11 @@ function downloadExcel() {
         XLSX.utils.book_append_sheet(workbook, worksheetBelum, "Belum Input");
     }
 
+    // Unduh File Excel
     XLSX.writeFile(workbook, "Rekap_Sistem_Ruang_Docking_Pusat.xlsx");
 }
-// --- PENGIRIMAN DATA KE FIREBASE DENGAN POP-UP & LOADING C2 ---
-function kirimKeFirebase(event) {
-    event.preventDefault();
-    const btn = document.getElementById('btnSubmit');
-    const collector = document.getElementById('collector_select').value;
-    const customerSelect = document.getElementById('customer_select');
-    const selectedOption = customerSelect.options[customerSelect.selectedIndex];
-    
-    // Ambil nama customer asli dari dataset option yang dipilih
-    const customerName = selectedOption.dataset.namaCustomer || selectedOption.text || "Nasabah";
-    const nomorKontrak = document.getElementById('no_kontrak').value;
 
-    if (!customerName || !nomorKontrak) {
-        alert("Silakan pilih nasabah dan kontrak dengan benar!");
-        return;
-    }
-
-    // Tampilkan animasi loading C2 saat proses kirim berlangsung
-    showLoading("Mengirim Laporan ke Pak Bambang...");
-    btn.disabled = true;
-    btn.innerText = "Mengirim...";
-    
-    let objekData = {
-        namaCustomer: customerName.toUpperCase(),
-        noKontrak: nomorKontrak.toString().trim(),
-        remedialMk2: collector.toUpperCase(),
-        progresDocking: document.getElementById('prediksi_sukses').value,
-        tglJb: document.getElementById('tgl_prediksi_jb').value,
-        dlq: document.getElementById('deliquency').value.toUpperCase(),
-        ansus: document.getElementById('detail_kasus').value,
-        inputBy: userAktif ? userAktif.nama : "Karyawan"
-    };
-
-    database.ref('data_docking').push(objekData, function(error) {
-        // Sembunyikan loading
-        hideLoading();
-        btn.disabled = false;
-        btn.innerText = "Kirim Laporan";
-
-        if (error) {
-            alert("Gagal mengirim data: " + error.message);
-        } else {
-            // POP-UP NOTIFIKASI SUKSES DENGAN KETERANGAN KE PAK BAMBANG
-            alert(`✅ Laporan untuk nasabah "${customerName.toUpperCase()}" (Kontrak: ${nomorKontrak}) telah berhasil dikirim ke Pak Bambang!`);
-            
-            // Reset form
-            document.getElementById('updateForm').reset();
-            document.getElementById('customer_select').innerHTML = '<option value="">-- Pilih Kolektor Dahulu --</option>';
-            document.getElementById('customer_select').disabled = true;
-            document.getElementById('no_kontrak').value = '';
-        }
-    });
-}
+// --- 10. JALANKAN INISIALISASI SAAT HALAMAN SELESAI DIMUAT ---
+document.addEventListener('DOMContentLoaded', () => {
+    inisialisasiRealtimeListener();
+});
