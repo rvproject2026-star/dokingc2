@@ -35,9 +35,9 @@ window.addEventListener('DOMContentLoaded', () => {
         tampilkanRiwayatSingkat(dataObjek);
         tampilkanTabelOnlinePakSalman(dataObjek);
         
-        const currentCollector = document.getElementById('collector_select').value;
-        if (currentCollector) {
-            filterCustomers(currentCollector);
+        const collectorSelect = document.getElementById('collector_select');
+        if (collectorSelect && collectorSelect.value) {
+            filterCustomers(collectorSelect.value);
         }
     });
 });
@@ -208,7 +208,7 @@ function isiOtomatisNoKontrak(kontrakTerpilih) {
     noKontrakInput.value = kontrakTerpilih;
 }
 
-// --- 6. PENGIRIMAN DATA KE FIREBASE (DENGAN NOTIFIKASI & LOADING C2) ---
+// --- 6. PENGIRIMAN DATA KE FIREBASE ---
 function kirimKeFirebase(event) {
     event.preventDefault();
     const btn = document.getElementById('btnSubmit');
@@ -224,7 +224,6 @@ function kirimKeFirebase(event) {
         return;
     }
 
-    // Tampilkan animasi loading C2
     if (typeof showLoading === 'function') showLoading("Mengirim Laporan ke Pak Bambang...");
     btn.disabled = true;
     btn.innerText = "Mengirim...";
@@ -248,21 +247,17 @@ function kirimKeFirebase(event) {
         if (error) {
             alert("Gagal mengirim data: " + error.message);
         } else {
-            // Getar HP jika perangkat mendukung
             if ("vibrate" in navigator) {
                 navigator.vibrate([200, 100, 200]);
             }
 
-            // Memutar suara notifikasi singkat
             try {
                 let audioNotif = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
                 audioNotif.play().catch(e => console.log("Audio diblokir oleh browser"));
             } catch(e) {}
 
-            // Pop-up Notifikasi Sukses Spesifik
-            alert(`✅ Laporan untuk nasabah "${customerName.toUpperCase()}" (Kontrak: ${nomorKontrak}) telah berhasil dikirim ke Pak Bambang!`);
+            alert(`✅ Laporan untuk nasabah "${customerName.toUpperCase()}" (Kontrak: ${nomorKontrak}) telah berhasil dikirim!`);
             
-            // Reset Form Laporan
             document.getElementById('updateForm').reset();
             document.getElementById('customer_select').innerHTML = '<option value="">-- Pilih Kolektor Dahulu --</option>';
             document.getElementById('customer_select').disabled = true;
@@ -271,7 +266,7 @@ function kirimKeFirebase(event) {
     });
 }
 
-// --- 7. UPLOAD EXCEL MASTER NASABAH (DENGAN MENYIMPAN SELURUH STRUKTUR KOLOM ASLI) ---
+// --- 7. UPLOAD EXCEL MASTER NASABAH ---
 function uploadMasterExcelKeFirebase() {
     const fileInput = document.getElementById('excelMasterFile');
     if (fileInput.files.length === 0) {
@@ -312,7 +307,7 @@ function uploadMasterExcelKeFirebase() {
                     structuredData[kolektor].push({
                         nama: namaCust,
                         kontrak: noKontrak,
-                        rawRow: row // Menyimpan seluruh kolom asli dari file Excel
+                        rawRow: row
                     });
                 }
             });
@@ -342,75 +337,6 @@ function uploadMasterExcelKeFirebase() {
 
     reader.readAsArrayBuffer(file);
 }
-
-// --- 9. DOWNLOAD EXCEL REKAP (SESUAI STRUKTUR FILE EXCEL MASTER + INPUTAN APK) ---
-function downloadExcel() {
-    let dataSudahInputExcel = [];
-    let dataBelumInputExcel = [];
-    let kontrakSudahInputMap = {};
-
-    const checkboxes = document.querySelectorAll('.chk-nasabah:checked');
-    
-    // 1. Kumpulkan data laporan yang dicentang
-    if (globalDatabaseSnapshot && checkboxes.length > 0) {
-        checkboxes.forEach(cb => {
-            let key = cb.value;
-            let item = globalDatabaseSnapshot[key];
-            if (item && item.noKontrak) {
-                let kontrakClean = item.noKontrak.toString().trim();
-                kontrakSudahInputMap[kontrakClean] = item;
-            }
-        });
-    }
-
-    // 2. Loop data master nasabah untuk menyusun baris sesuai format asli Excel
-    if (dataInput && Object.keys(dataInput).length > 0) {
-        Object.keys(dataInput).forEach(kolektor => {
-            dataInput[kolektor].forEach(nasabahObj => {
-                let kontrakClean = (nasabahObj.kontrak || "").toString().trim();
-                let baseRow = nasabahObj.rawRow ? { ...nasabahObj.rawRow } : {
-                    "NO KONTRAK": nasabahObj.kontrak,
-                    "NAMA CUSTOMER": nasabahObj.nama,
-                    "KOLEKTOR": kolektor
-                };
-
-                if (kontrakSudahInputMap[kontrakClean]) {
-                    let inputItem = kontrakSudahInputMap[kontrakClean];
-                    
-                    // Update kolom-kolom dari APK ke struktur Excel asli
-                    baseRow["JB"] = inputItem.tglJb || baseRow["JB"] || "";
-                    baseRow["PRED"] = inputItem.progresDocking || baseRow["PRED"] || "";
-                    baseRow["DELQ"] = inputItem.dlq || baseRow["DELQ"] || "";
-                    baseRow["ANSUS"] = inputItem.ansus || baseRow["ANSUS"] || "";
-
-                    dataSudahInputExcel.push(baseRow);
-                } else {
-                    dataBelumInputExcel.push(baseRow);
-                }
-            });
-        });
-    }
-
-    if (dataSudahInputExcel.length === 0 && dataBelumInputExcel.length === 0) {
-        alert("Tidak ada data untuk diunduh!");
-        return;
-    }
-
-    const workbook = XLSX.utils.book_new();
-
-    if (dataSudahInputExcel.length > 0) {
-        const worksheetSudah = XLSX.utils.json_to_sheet(dataSudahInputExcel);
-        XLSX.utils.book_append_sheet(workbook, worksheetSudah, "Sudah Input");
-    }
-
-    if (dataBelumInputExcel.length > 0) {
-        const worksheetBelum = XLSX.utils.json_to_sheet(dataBelumInputExcel);
-        XLSX.utils.book_append_sheet(workbook, worksheetBelum, "Belum Input");
-    }
-
-    XLSX.writeFile(workbook, "Rekap_Sistem_Ruang_Docking_Pusat.xlsx");
-}
-
 
 // --- 8. TABEL LIVE HISTORY & CONTROL PANEL PAK BAMBANG ---
 function tampilkanRiwayatSingkat(dataObjek) {
@@ -560,20 +486,22 @@ function downloadExcel() {
     let dataBelumInputExcel = [];
     let indexBelum = 1;
 
-    Object.keys(dataInput).forEach(kolektor => {
-        dataInput[kolektor].forEach(nasabahObj => {
-            let kontrakClean = (nasabahObj.kontrak || "").toString().trim();
-            if (!kontrakSudahInputList.includes(kontrakClean)) {
-                dataBelumInputExcel.push({
-                    "NO": indexBelum++,
-                    "NAMA CUSTOMER": nasabahObj.nama,
-                    "NO KONTRAK": nasabahObj.kontrak,
-                    "REMEDIAL / MK2": kolektor,
-                    "STATUS KETERANGAN": "BELUM INPUT DATA DOCKING"
-                });
-            }
+    if (dataInput) {
+        Object.keys(dataInput).forEach(kolektor => {
+            dataInput[kolektor].forEach(nasabahObj => {
+                let kontrakClean = (nasabahObj.kontrak || "").toString().trim();
+                if (!kontrakSudahInputList.includes(kontrakClean)) {
+                    dataBelumInputExcel.push({
+                        "NO": indexBelum++,
+                        "NAMA CUSTOMER": nasabahObj.nama,
+                        "NO KONTRAK": nasabahObj.kontrak,
+                        "REMEDIAL / MK2": kolektor,
+                        "STATUS KETERANGAN": "BELUM INPUT DATA DOCKING"
+                    });
+                }
+            });
         });
-    });
+    }
 
     const workbook = XLSX.utils.book_new();
 
