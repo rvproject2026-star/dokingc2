@@ -1,22 +1,13 @@
 // ==========================================
 // KODE LENGKAP APP.JS - RUANG DOCKING C2
+// (Konfigurasi Firebase diambil dari file terpisah)
 // ==========================================
 
-// --- 1. INISIALISASI KONFIGURASI FIREBASE ---
-// (Ganti dengan konfigurasi Firebase Anda)
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
-
-// Inisialisasi Firebase
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
+// Inisialisasi Firebase jika belum diinisialisasi
+if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+    if (typeof firebaseConfig !== 'undefined') {
+        firebase.initializeApp(firebaseConfig);
+    }
 }
 const database = firebase.database();
 
@@ -24,10 +15,9 @@ const database = firebase.database();
 let globalDatabaseSnapshot = null;
 let dataInput = {}; 
 
-// --- 2. FITUR EFEK SUARA & GETAR (VIBRATION & AUDIO) ---
+// --- 1. FITUR EFEK SUARA & GETAR (VIBRATION & AUDIO) ---
 function playNotificationSound() {
     try {
-        // Suara notifikasi singkat
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -45,7 +35,7 @@ function playNotificationSound() {
         osc.start();
         osc.stop(audioCtx.currentTime + 0.3);
     } catch (e) {
-        console.log("Audio not supported or blocked by browser.");
+        console.log("Audio tidak didukung atau diblokir browser.");
     }
 }
 
@@ -56,7 +46,7 @@ function triggerVibration() {
     }
 }
 
-// --- 3. ANIMASI LOADING C2 & POP-UP INTERAKTIF ---
+// --- 2. ANIMASI LOADING C2 & POP-UP INTERAKTIF ---
 function showLoading(pesan = "Memproses Data C2...") {
     let loader = document.getElementById('c2LoaderOverlay');
     if (!loader) {
@@ -90,7 +80,7 @@ function hideLoading() {
     if (loader) loader.style.display = 'none';
 }
 
-// --- 4. CARI & TAMPILKAN NASABAH BERDASARKAN KOLEKTOR ---
+// --- 3. CARI & TAMPILKAN NASABAH BERDASARKAN KOLEKTOR ---
 function muatDaftarNasabah() {
     const selectKolektor = document.getElementById('selectKolektor');
     const selectNasabah = document.getElementById('selectNasabah');
@@ -110,14 +100,14 @@ function muatDaftarNasabah() {
     }
 }
 
-// --- 5. KIRIM LAPORAN KOLEKTOR KE FIREBASE ---
+// --- 4. KIRIM LAPORAN KOLEKTOR KE FIREBASE ---
 function kirimLaporan() {
     const kolektor = document.getElementById('selectKolektor')?.value;
     const noKontrak = document.getElementById('selectNasabah')?.value;
     const progres = document.getElementById('selectProgres')?.value; // PRED
-    const tglJb = document.getElementById('inputTglJb')?.value; // JB
-    const dlq = document.getElementById('inputDlq')?.value; // DELQ
-    const ansus = document.getElementById('inputAnsus')?.value; // ANSUS
+    const tglJb = document.getElementById('inputTglJb')?.value;       // JB
+    const dlq = document.getElementById('inputDlq')?.value;           // DELQ
+    const ansus = document.getElementById('inputAnsus')?.value;       // ANSUS
     const catatan = document.getElementById('inputCatatan')?.value;
 
     if (!kolektor || !noKontrak || !progres) {
@@ -125,7 +115,6 @@ function kirimLaporan() {
         return;
     }
 
-    // Ambil nama nasabah dari pilihan
     const selectNasabah = document.getElementById('selectNasabah');
     const namaNasabah = selectNasabah.options[selectNasabah.selectedIndex].text.split(' (')[0];
 
@@ -148,13 +137,12 @@ function kirimLaporan() {
         if (error) {
             alert("❌ Gagal mengirim laporan: " + error.message);
         } else {
-            // Sensasi Suara & Getar saat Berhasil
+            // Sensasi Suara & Getar
             triggerVibration();
             playNotificationSound();
 
             alert(`✅ Laporan untuk nasabah "${namaNasabah}" (Kontrak: ${noKontrak}) telah berhasil dikirim ke Pak Bambang!`);
             
-            // Reset Form Input
             if (document.getElementById('formDocking')) {
                 document.getElementById('formDocking').reset();
             }
@@ -162,7 +150,7 @@ function kirimLaporan() {
     });
 }
 
-// --- 6. LISTEN DATA REALTIME DI CONTROL PANEL PAK BAMBANG ---
+// --- 5. LISTEN DATA REALTIME DI CONTROL PANEL PAK BAMBANG ---
 function inisialisasiRealtimeListener() {
     const tabelBody = document.getElementById('tabelRekapBody');
     if (!tabelBody) return;
@@ -195,7 +183,6 @@ function inisialisasiRealtimeListener() {
         });
     });
 
-    // Ambil Master Data Nasabah jika ada
     database.ref('master_nasabah').once('value', (snapshot) => {
         if (snapshot.exists()) {
             dataInput = snapshot.val();
@@ -203,7 +190,7 @@ function inisialisasiRealtimeListener() {
     });
 }
 
-// --- 7. UPLOAD EXCEL MASTER NASABAH (MENYIMPAN SELURUH STRUKTUR 52 KOLOM ASLI) ---
+// --- 6. UPLOAD EXCEL MASTER NASABAH (MENYIMPAN SELURUH STRUKTUR 52 KOLOM ASLI) ---
 function uploadMasterExcelKeFirebase() {
     const fileInput = document.getElementById('excelMasterFile');
     if (!fileInput || fileInput.files.length === 0) {
@@ -276,13 +263,13 @@ function uploadMasterExcelKeFirebase() {
     reader.readAsArrayBuffer(file);
 }
 
-// --- 8. FITUR PILIH / CENTANG SEMUA CHECKBOX ---
+// --- 7. FITUR PILIH / CENTANG SEMUA CHECKBOX ---
 function toggleSelectAll(masterCheckbox) {
     const checkboxes = document.querySelectorAll('.chk-nasabah');
     checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
 }
 
-// --- 9. DOWNLOAD EXCEL REKAP (SESUAI STRUKTUR MASTER EXCEL + INPUTAN APK) ---
+// --- 8. DOWNLOAD EXCEL REKAP (SESUAI STRUKTUR MASTER EXCEL + INPUTAN APK) ---
 function downloadExcel() {
     let dataSudahInputExcel = [];
     let dataBelumInputExcel = [];
@@ -308,7 +295,7 @@ function downloadExcel() {
             dataInput[kolektor].forEach(nasabahObj => {
                 let kontrakClean = (nasabahObj.kontrak || "").toString().trim();
                 
-                // Ambil seluruh kolom asli dari Master Excel
+                // Ambil seluruh 52 kolom asli dari Master Excel
                 let baseRow = nasabahObj.rawRow ? { ...nasabahObj.rawRow } : {
                     "NO KONTRAK": nasabahObj.kontrak,
                     "NAMA CUSTOMER": nasabahObj.nama,
@@ -337,7 +324,6 @@ function downloadExcel() {
         return;
     }
 
-    // Buat file Workbook Excel
     const workbook = XLSX.utils.book_new();
 
     if (dataSudahInputExcel.length > 0) {
@@ -350,11 +336,10 @@ function downloadExcel() {
         XLSX.utils.book_append_sheet(workbook, worksheetBelum, "Belum Input");
     }
 
-    // Unduh File Excel
     XLSX.writeFile(workbook, "Rekap_Sistem_Ruang_Docking_Pusat.xlsx");
 }
 
-// --- 10. JALANKAN INISIALISASI SAAT HALAMAN SELESAI DIMUAT ---
+// --- 9. INISIALISASI SAAT HALAMAN SELESAI DIMUAT ---
 document.addEventListener('DOMContentLoaded', () => {
     inisialisasiRealtimeListener();
 });
