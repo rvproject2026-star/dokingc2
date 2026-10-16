@@ -47,20 +47,6 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 
-    database.ref('data_docking').on('value', (snapshot) => {
-        const dataObjek = snapshot.val();
-        globalDatabaseSnapshot = dataObjek;
-        
-        tampilkanRiwayatSingkat(dataObjek);
-        tampilkanTabelOnlinePakSalman(dataObjek);
-        
-        const collectorSelect = document.getElementById('collector_select');
-        if (collectorSelect && collectorSelect.value) {
-            filterCustomers(collectorSelect.value);
-        }
-    });
-});
-
 // --- 3. LOGIKA LOGIN DENGAN ANIMASI C2 ---
 function prosesLogin(event) {
     event.preventDefault();
